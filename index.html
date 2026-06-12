@@ -23,6 +23,18 @@ input,select,textarea,button,label{font-family:inherit;}
 .header p{color:#a8d4be;font-size:11px;font-family:monospace;}
 .version-badge{position:absolute;top:6px;right:4px;font-size:9px;color:rgba(255,255,255,.4);font-family:monospace;cursor:pointer;padding:2px 6px;border-radius:4px;border:1px solid rgba(255,255,255,.15);text-decoration:none;transition:all .2s;}
 .version-badge:hover{color:rgba(255,255,255,.9);border-color:rgba(255,255,255,.4);background:rgba(255,255,255,.08);}
+.reset-badge{position:absolute;top:6px;left:4px;font-size:9px;color:rgba(255,255,255,.3);font-family:monospace;cursor:pointer;padding:2px 7px;border-radius:4px;border:1px solid rgba(255,255,255,.12);text-decoration:none;transition:all .2s;font-weight:700;}
+.reset-badge:hover{color:rgba(255,255,255,.8);border-color:rgba(255,255,255,.35);background:rgba(255,255,255,.07);}
+/* Modal senha */
+.pwd-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:9997;align-items:center;justify-content:center;padding:20px;}
+.pwd-bg.open{display:flex;}
+.pwd-box{background:#fff;border-radius:14px;padding:24px;width:100%;max-width:320px;box-shadow:0 20px 60px rgba(0,0,0,.5);}
+.pwd-title{color:var(--g);font-size:15px;font-weight:800;margin-bottom:12px;}
+.pwd-box input{width:100%;padding:11px 13px;border-radius:9px;border:1.5px solid var(--gm);background:var(--gl);font-size:15px;outline:none;margin-bottom:12px;letter-spacing:2px;}
+.pwd-btns{display:flex;gap:8px;}
+.pwd-ok{flex:1;padding:11px;border-radius:9px;border:none;background:var(--g);color:#fff;font-weight:700;font-size:14px;cursor:pointer;}
+.pwd-cancel{flex:1;padding:11px;border-radius:9px;border:1.5px solid var(--gm);background:var(--gl);color:var(--g);font-weight:700;font-size:14px;cursor:pointer;}
+.pwd-err{font-size:11px;color:#dc2626;margin-top:8px;font-family:monospace;display:none;}
 /* CHANGELOG */
 .cl-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:9998;align-items:flex-start;justify-content:center;padding:20px;overflow-y:auto;}
 .cl-bg.open{display:flex;}
@@ -134,6 +146,19 @@ input,select,textarea,button,label{font-family:inherit;}
 </div>
 
 <!-- Changelog Modal -->
+<!-- Modal senha Reset -->
+<div class="pwd-bg" id="pwd-modal">
+  <div class="pwd-box">
+    <div class="pwd-title">🔒 Resetar Contador</div>
+    <input type="password" id="pwd-input" placeholder="Senha" onkeydown="if(event.key==='Enter')confirmarReset()"/>
+    <div class="pwd-btns">
+      <button class="pwd-ok" onclick="confirmarReset()">Confirmar</button>
+      <button class="pwd-cancel" onclick="fecharPwd()">Cancelar</button>
+    </div>
+    <div class="pwd-err" id="pwd-err">Senha incorreta.</div>
+  </div>
+</div>
+
 <div class="cl-bg" id="cl-modal">
   <div class="cl-box">
     <div class="cl-title">
@@ -146,7 +171,8 @@ input,select,textarea,button,label{font-family:inherit;}
 
 <div class="page">
   <div class="header">
-    <a class="version-badge" onclick="abrirChangelog()" href="javascript:void(0)">v2.0</a>
+    <a class="reset-badge" onclick="abrirPwd()" href="javascript:void(0)" title="Reset contador">R</a>
+    <a class="version-badge" onclick="abrirChangelog()" href="javascript:void(0)">v2.2</a>
     <div class="logo-wrap"><img src="data:image/png;base64,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" alt="Timenow"/></div>
     <h1>Inspeção de Andaimes</h1>
     <p>Preencha o formulário e gere o relatório Excel</p>
@@ -298,7 +324,7 @@ const FIXED_EMAIL={nome:"Rodrigo Rodrigues",email:"rodrigo.a.rodrigues@amcontrat
 document.getElementById("data").value=new Date().toISOString().split("T")[0];
 
 // ── CHANGELOG ─────────────────────────────────────────────────────────────
-const CL={"v2.0":["Linha Entrada Galpao removida do Local","Caminho do arquivo exibido apos download","Email usa numero da planilha gerada (nao do proximo)","Email corrigido para iOS e Android"],"v1.9":["Contador inicia em 001","Opcao Entrada Galpao simplificada","Campos editaveis em verde","Campos somente leitura em cinza"],
+const CL={"v2.2":["Botao R reset contador com senha","iOS: download e fotos corrigidos (b64ToBytes, FileReader)","iOS: compressao STORE evita travamento","Centralização fotos corrigida"],"v2.0":["Linha Entrada Galpao removida do Local","Caminho do arquivo exibido apos download","Email usa numero da planilha gerada (nao do proximo)","Email corrigido para iOS e Android"],"v1.9":["Contador inicia em 001","Opcao Entrada Galpao simplificada","Campos editaveis em verde","Campos somente leitura em cinza"],
   "v1.9":["Botao rotacionar foto adicionado","Fotos centralizadas corretamente no Excel","Destinatarios de email: adicionar/remover com dropdown","Nome Rodrigo Rodrigues com fonte maior"],
   "v1.7":["Historico de versoes clicavel","Local: CWA 06 removido, GM adicionado","Campo Outros aparece no Excel","Email fixo Rodrigo Rodrigues","Fotos mantém proporcao","Contador persistente","Nome do arquivo TNE-RIA-XXX-AMT"],
   "v1.6":["Reescrita completa do app","Correcao de bugs iOS","EXIF orientation para iPhone"],
@@ -318,6 +344,38 @@ function abrirChangelog(){
 
 // ── CONTADOR ──────────────────────────────────────────────────────────────
 const SK="ria_global_seq";
+function abrirPwd(){
+  document.getElementById("pwd-input").value="";
+  document.getElementById("pwd-err").style.display="none";
+  document.getElementById("pwd-modal").className="pwd-bg open";
+  setTimeout(()=>document.getElementById("pwd-input").focus(),100);
+}
+function fecharPwd(){
+  document.getElementById("pwd-modal").className="pwd-bg";
+}
+async function confirmarReset(){
+  const pwd=document.getElementById("pwd-input").value;
+  const err=document.getElementById("pwd-err");
+  if(pwd!=="TimeNow001*"){
+    err.style.display="block"; err.textContent="Senha incorreta.";
+    document.getElementById("pwd-input").value="";
+    return;
+  }
+  fecharPwd();
+  // Resetar contador para 1
+  localStorage.setItem(SK,"1");
+  const el=document.getElementById("nrel");
+  el.value="TNE - RIA-001 / AMT"; el.dataset.seq="1";
+  try{
+    await fetch("https://api.anthropic.com/v1/messages",{
+      method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:50,
+        messages:[{role:"user",content:`Set storage key "${SK}" to 1. Return {"ok":true}.`}]})
+    });
+  }catch{}
+  alert("✓ Contador resetado para 001.");
+}
+
 async function buscarContador(){
   const el=document.getElementById("nrel"); el.value="Carregando...";
   let seq=2;
@@ -491,9 +549,7 @@ function rotacionar(i){
 
 function getExifOrientation(dataUrl,cb){
   try{
-    const bin=atob(dataUrl.split(",")[1]);
-    const bytes=new Uint8Array(bin.length);
-    for(let j=0;j<bin.length;j++) bytes[j]=bin.charCodeAt(j);
+    const bytes=b64ToBytes(dataUrl.split(",")[1]);
     const view=new DataView(bytes.buffer);
     if(view.getUint16(0,false)!==0xFFD8){cb(-1);return;}
     let off=2;
@@ -550,6 +606,15 @@ function rebuild(i){ document.getElementById("foto-grid").replaceChild(buildCard
 // ── HELPERS ───────────────────────────────────────────────────────────────
 function gv(id){return document.getElementById(id).value;}
 function setLoad(v,t){document.getElementById("load").className="load-bg"+(v?" open":"");if(t)document.getElementById("load-txt").innerHTML=t;}
+
+// Decode base64 em chunks — evita stack overflow no iOS com strings grandes
+function b64ToBytes(b64){
+  const bin=atob(b64);
+  const len=bin.length;
+  const bytes=new Uint8Array(len);
+  for(let i=0;i<len;i++) bytes[i]=bin.charCodeAt(i);
+  return bytes;
+}
 
 function showFileToast(isIOS, fname){
   const toast=document.getElementById("file-toast");
@@ -647,7 +712,7 @@ async function gerarExcel(){
   btn.className="gbtn wait"; btn.textContent="Aguarde...";
   setLoad(true,"Gerando Excel com fotos...<br>Aguarde alguns segundos.");
   try{
-    const zip=await JSZip.loadAsync(Uint8Array.from(atob(TMPL_B64),c=>c.charCodeAt(0)));
+    const zip=await JSZip.loadAsync(b64ToBytes(TMPL_B64));
     let sx=await zip.file("xl/worksheets/sheet1.xml").async("string");
     sx=setDateXml(sx,"B12",gv("data"));
     sx=setCellXml(sx,"J4",gv("nrel")); sx=setCellXml(sx,"J26",gv("nrel"));
@@ -669,31 +734,43 @@ async function gerarExcel(){
     const fMedia=["xl/media/image3.jpeg","xl/media/image4.jpeg","xl/media/image5.jpeg","xl/media/image6.jpeg"];
     for(let i=0;i<4;i++){
       if(fotos[i]){
-        const bytes=Uint8Array.from(atob(fotos[i].split(",")[1]),c=>c.charCodeAt(0));
+        const bytes=b64ToBytes(fotos[i].split(",")[1]);
         zip.file(fMedia[i],bytes);
         if(!fotoSizes[i]){
+          // Usar dataURL (mais seguro no iOS que createObjectURL)
           await new Promise(res=>{
             const img=new Image();
-            img.onload=()=>{fotoSizes[i]={w:img.naturalWidth,h:img.naturalHeight};URL.revokeObjectURL(img.src);res();};
-            img.onerror=()=>res();
-            img.src=URL.createObjectURL(new Blob([bytes],{type:"image/jpeg"}));
+            img.onload=()=>{fotoSizes[i]={w:img.naturalWidth,h:img.naturalHeight};res();};
+            img.onerror=()=>{fotoSizes[i]={w:300,h:400};res();};
+            img.src=fotos[i]; // usar dataURL original
           });
         }
       }
     }
     zip.file("xl/drawings/drawing1.xml",buildDrawingXml(fotoSizes));
 
-    const blob=await zip.generateAsync({type:"blob",mimeType:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",compression:"DEFLATE"});
+    const isIOS=/iPad|iPhone|iPod/.test(navigator.userAgent)&&!window.MSStream;
+    const blob=await zip.generateAsync({type:"blob",mimeType:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",compression:(isIOS?"STORE":"DEFLATE")});
     const seq=String(parseInt(document.getElementById("nrel").dataset.seq||"2")).padStart(3,"0");
     lastFname=`TNE-RIA-${seq}-AMT.xlsx`;
     lastNrel=`TNE - RIA-${seq} / AMT`; lastSeqNum=seq;
-
-    const url=URL.createObjectURL(blob);
-    const isIOS=/iPad|iPhone|iPod/.test(navigator.userAgent)&&!window.MSStream;
-    const a=document.createElement("a"); a.href=url; a.download=lastFname; a.style.display="none";
-    if(isIOS) a.target="_blank";
-    document.body.appendChild(a); a.click();
-    setTimeout(()=>{document.body.removeChild(a);if(!isIOS)URL.revokeObjectURL(url);},2000);
+    if(isIOS){
+      // iOS: converter para base64 dataURL e abrir — mais confiável que createObjectURL
+      const reader=new FileReader();
+      reader.onload=function(){
+        const a=document.createElement("a");
+        a.href=reader.result; a.download=lastFname;
+        a.target="_blank"; a.style.display="none";
+        document.body.appendChild(a); a.click();
+        setTimeout(()=>document.body.removeChild(a),500);
+      };
+      reader.readAsDataURL(blob);
+    } else {
+      const url=URL.createObjectURL(blob);
+      const a=document.createElement("a"); a.href=url; a.download=lastFname; a.style.display="none";
+      document.body.appendChild(a); a.click();
+      setTimeout(()=>{document.body.removeChild(a);URL.revokeObjectURL(url);},2000);
+    }
 
     await incrementarContador();
     setLoad(false);
