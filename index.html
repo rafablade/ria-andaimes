@@ -586,16 +586,17 @@ function setDateXml(xml,addr,ds){
 // Drawing XML — fotos centralizadas mantendo proporção
 function buildDrawingXml(fInfos){
   const logo=`<xdr:oneCellAnchor><xdr:from><xdr:col>1</xdr:col><xdr:colOff>133351</xdr:colOff><xdr:row>3</xdr:row><xdr:rowOff>142876</xdr:rowOff></xdr:from><xdr:ext cx="1528233" cy="358867"/><xdr:pic><xdr:nvPicPr><xdr:cNvPr id="1" name="Logo1"/><xdr:cNvPicPr/></xdr:nvPicPr><xdr:blipFill><a:blip r:embed="rId1" cstate="print"/><a:stretch><a:fillRect/></a:stretch></xdr:blipFill><xdr:spPr><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></xdr:spPr></xdr:pic><xdr:clientData/></xdr:oneCellAnchor><xdr:oneCellAnchor><xdr:from><xdr:col>1</xdr:col><xdr:colOff>133351</xdr:colOff><xdr:row>25</xdr:row><xdr:rowOff>142876</xdr:rowOff></xdr:from><xdr:ext cx="1528233" cy="358867"/><xdr:pic><xdr:nvPicPr><xdr:cNvPr id="2" name="Logo2"/><xdr:cNvPicPr/></xdr:nvPicPr><xdr:blipFill><a:blip r:embed="rId2" cstate="print"/><a:stretch><a:fillRect/></a:stretch></xdr:blipFill><xdr:spPr><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></xdr:spPr></xdr:pic><xdr:clientData/></xdr:oneCellAnchor>`;
-  // Áreas reais das células de foto (calculadas do XML da planilha)
-  // FOTO 01/02: label row 50 (0-based=49), imagem rows 51-69 (0-based 50-68), cols B-F / G-K
-  // FOTO 03/04: label row 70 (0-based=69), imagem rows 71-72 mas usamos same height que 01/02
-  // cx = 5 colunas × 8.43 chars × 66675 EMU = 2810351 EMU ≈ 295px
-  // cy foto01/02 = 19 linhas × 19.5pt × 12700 EMU = 4705350 EMU ≈ 494px
+  // Dimensões REAIS das células calculadas do XML da planilha:
+  // Cols B-F (2-6): 5 × 8.43chars × 66675 EMU = 2810350 EMU (295px)
+  // Cols G-K (7-11): igual = 2810350 EMU (295px)  
+  // Rows 31-49: 19 × 19.5pt × 12700 = 4705350 EMU (494px)
+  // Rows 51-69: igual = 4705350 EMU (494px)
+  // Âncoras col/row = valores do template (col=1/6, row=30/50) — corretos
   const areas=[
-    {rId:"rId3",col:1,row:50,areaCx:2810351,areaCy:4705350},
-    {rId:"rId4",col:6,row:50,areaCx:2810351,areaCy:4705350},
-    {rId:"rId5",col:1,row:70,areaCx:2810351,areaCy:4705350},
-    {rId:"rId6",col:6,row:70,areaCx:2810351,areaCy:4705350},
+    {rId:"rId3",col:1,row:30,areaCx:2810350,areaCy:4705350},
+    {rId:"rId4",col:6,row:30,areaCx:2810350,areaCy:4705350},
+    {rId:"rId5",col:1,row:50,areaCx:2810350,areaCy:4705350},
+    {rId:"rId6",col:6,row:50,areaCx:2810350,areaCy:4705350},
   ];
   let fxml="";
   areas.forEach((a,i)=>{
