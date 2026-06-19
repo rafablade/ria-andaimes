@@ -8,6 +8,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes"/>
 <meta name="apple-mobile-web-app-title" content="RIA Andaimes"/>
 <title>RIA — Inspeção de Andaimes</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
 :root{--g:#1a5c44;--g2:#22744f;--gl:#e8f5ef;--gm:#c8e6d8;--gold:#b8a06a;--tx:#1a2e25;--gray:#d9d9d9;}
@@ -275,6 +276,9 @@ input,select,textarea,button,label{font-family:inherit;}
 
     <div class="gerar-wrap">
       <button class="gbtn" id="gbtn" onclick="gerarExcel()">⬇ Gerar Relatório</button>
+    </div>
+    <div class="gerar-wrap" id="pdf-wrap" style="display:none;padding-top:0;">
+      <button class="gbtn" id="pdfbtn" onclick="gerarPDF()" style="background:linear-gradient(135deg,#b8a06a,#caa968);box-shadow:0 4px 20px rgba(184,160,106,.4);">📄 Gerar PDF</button>
     </div>
 
     <div class="sh">07 / Enviar por E-mail</div>
@@ -666,8 +670,8 @@ function setDateXml(xml,addr,ds){
 function buildDrawingXml(fInfos){
   const logo=`<xdr:oneCellAnchor><xdr:from><xdr:col>1</xdr:col><xdr:colOff>133351</xdr:colOff><xdr:row>3</xdr:row><xdr:rowOff>142876</xdr:rowOff></xdr:from><xdr:ext cx="1528233" cy="358867"/><xdr:pic><xdr:nvPicPr><xdr:cNvPr id="1" name="Logo1"/><xdr:cNvPicPr/></xdr:nvPicPr><xdr:blipFill><a:blip r:embed="rId1" cstate="print"/><a:stretch><a:fillRect/></a:stretch></xdr:blipFill><xdr:spPr><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></xdr:spPr></xdr:pic><xdr:clientData/></xdr:oneCellAnchor><xdr:oneCellAnchor><xdr:from><xdr:col>1</xdr:col><xdr:colOff>133351</xdr:colOff><xdr:row>25</xdr:row><xdr:rowOff>142876</xdr:rowOff></xdr:from><xdr:ext cx="1528233" cy="358867"/><xdr:pic><xdr:nvPicPr><xdr:cNvPr id="2" name="Logo2"/><xdr:cNvPicPr/></xdr:nvPicPr><xdr:blipFill><a:blip r:embed="rId2" cstate="print"/><a:stretch><a:fillRect/></a:stretch></xdr:blipFill><xdr:spPr><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></xdr:spPr></xdr:pic><xdr:clientData/></xdr:oneCellAnchor>`;
   // Dimensões pixel-perfect openpyxl: int(width*7+5), int(4*height/3)
-  // B-F=485px G-K=528px Rows=494px — margem 3% cada lado
-  const MARG=0.03;
+  // B-F=485px G-K=528px Rows=494px — margem 8% cada lado (validado contra arquivo real gerado no Excel mobile)
+  const MARG=0.08;
   const areas=[
     {rId:"rId3",col:1,row:30,cxPx:485,cyPx:494},
     {rId:"rId4",col:6,row:30,cxPx:528,cyPx:494},
@@ -745,6 +749,207 @@ function resetApp(){
   document.getElementById("email-note").style.color="";
 }
 
+// ── GERAR PDF (replica layout do Excel) ─────────────────────────────────
+async function gerarPDF(){
+  const pbtn=document.getElementById("pdfbtn");
+  pbtn.className="gbtn wait"; pbtn.textContent="Gerando PDF...";
+  setLoad(true,"Gerando PDF...<br>Aguarde alguns segundos.");
+  try{
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ unit:"mm", format:"a4", orientation:"portrait" });
+    const pageW=210, pageH=297, margin=10;
+    const contentW=pageW-margin*2;
+
+    const nrelDisplay=lastNrel||gv("nrel");
+    const dataVal=gv("data");
+    const dataFmt=dataVal?new Date(dataVal+"T12:00:00").toLocaleDateString("pt-BR"):"";
+
+    function header(folha){
+      doc.setFillColor(255,255,255);
+      doc.setDrawColor(26,92,68);
+      doc.setLineWidth(0.4);
+      doc.rect(margin,margin,contentW,18);
+      try{
+        const logoImg=document.querySelector(".logo-wrap img");
+        if(logoImg && logoImg.src) doc.addImage(logoImg.src,"PNG",margin+2,margin+2,30,14);
+      }catch(e){}
+      doc.setFont("helvetica","bold"); doc.setFontSize(11); doc.setTextColor(20,20,20);
+      doc.text("RELATÓRIO DE INSPEÇÕES DE ANDAIMES",margin+38,margin+10);
+      doc.setFontSize(8); doc.setFont("helvetica","normal");
+      doc.text("Nº Relatório:",pageW-margin-48,margin+5);
+      doc.setFont("helvetica","bold");
+      doc.text(nrelDisplay,pageW-margin-48,margin+9);
+      doc.setFont("helvetica","normal");
+      doc.text("Data: "+dataFmt,pageW-margin-48,margin+13);
+      doc.text("Folha: "+folha,pageW-margin-48,margin+17);
+      return margin+22;
+    }
+
+    function fieldRow(y,cols){
+      // cols: [{label,value,w}]
+      let x=margin;
+      const h=10;
+      cols.forEach(c=>{
+        doc.setDrawColor(150,150,150); doc.setLineWidth(0.2);
+        doc.rect(x,y,c.w,h);
+        doc.setFillColor(230,230,230);
+        doc.rect(x,y,c.w,5,"F"); doc.rect(x,y,c.w,5);
+        doc.setFont("helvetica","bold"); doc.setFontSize(7); doc.setTextColor(0,0,0);
+        doc.text(c.label,x+c.w/2,y+3.5,{align:"center"});
+        doc.setFont("helvetica","normal"); doc.setFontSize(8);
+        doc.text(String(c.value||""),x+c.w/2,y+8,{align:"center"});
+        x+=c.w;
+      });
+      return y+h;
+    }
+
+    function sectionTitle(y,text){
+      doc.setFillColor(26,92,68);
+      doc.rect(margin,y,contentW,6,"F");
+      doc.setFont("helvetica","bold"); doc.setFontSize(8); doc.setTextColor(255,255,255);
+      doc.text(text,margin+2,y+4.2);
+      doc.setTextColor(0,0,0);
+      return y+6;
+    }
+
+    // ── PÁGINA 1 ──────────────────────────────────────────────────────────
+    let y=header("1/2");
+    y=sectionTitle(y,"IDENTIFICAÇÃO DA NÃO CONFORMIDADE");
+    const w3=contentW/3;
+    y=fieldRow(y,[
+      {label:"PROJETO",value:gv("proj"),w:w3},
+      {label:"LOCAL",value:gv("local"),w:w3},
+      {label:"EMPRESA MONTADORA",value:gv("emp"),w:w3},
+    ]);
+    y=fieldRow(y,[
+      {label:"DATA DA INSPEÇÃO",value:dataFmt,w:w3},
+      {label:"FISCAL",value:gv("fiscal"),w:w3},
+      {label:"TIPO DE ANDAIME",value:gv("tipo"),w:w3},
+    ]);
+
+    y+=2;
+    doc.setDrawColor(150,150,150); doc.rect(margin,y,contentW,16);
+    doc.setFillColor(230,230,230); doc.rect(margin,y,contentW,5,"F"); doc.rect(margin,y,contentW,5);
+    doc.setFont("helvetica","bold"); doc.setFontSize(7);
+    doc.text("OBJETIVO",margin+2,y+3.5);
+    doc.setFont("helvetica","normal"); doc.setFontSize(6.5);
+    const obj="O presente relatório tem como objetivo registrar a inspeção técnica do andaime industrial, verificando conformidade com NR-18, NR-35 e procedimentos internos de segurança da Arcelor Mittal Tubarão no projeto Despoeiramento do Topo da Aciaria.";
+    doc.text(doc.splitTextToSize(obj,contentW-4),margin+2,y+9);
+    y+=18;
+
+    y=sectionTitle(y,"CHECK LIST DE INSPEÇÃO");
+    const ckRows=[
+      [["Base Nivelada","bNiv"],["Rodapé Instalado","rod"],["Etiqueta de Liberação","etiq"],["Andaime sobre Equipamentos","seq"]],
+      [["Sapatas Instaladas","sap"],["Escada de Acesso","esc"],["Linha de Vida Instalada","lv"],["Andaime sobre Pesssoas","spes"]],
+      [["Guarda-Corpo Instalado","gc"],["Plataforma Completa","plat"],["Área Sinalizada","sinal"],["Outros","out"]],
+    ];
+    const w4=contentW/4;
+    doc.setFontSize(6.5);
+    ckRows.forEach(row=>{
+      doc.setDrawColor(150,150,150);
+      let x=margin;
+      row.forEach(([label,key])=>{
+        doc.rect(x,y,w4,6);
+        let val=ckVals[key]||" ";
+        let txt=`(${val}) ${label}`;
+        if(key==="out"&&val==="S"){
+          const ot=document.getElementById("out-txt").value||"";
+          if(ot) txt=`(S) Outros: ${ot}`;
+        }
+        doc.text(doc.splitTextToSize(txt,w4-2),x+1,y+3,{maxWidth:w4-2});
+        x+=w4;
+      });
+      y+=6;
+    });
+
+    doc.setFontSize(6.5);
+    doc.rect(margin,y,contentW,5);
+    doc.text(`Em caso de Andaimes sobre equipamentos, informado ao User Leader? (${condVals.eq||" "})`,margin+1,y+3.3);
+    y+=5;
+    doc.rect(margin,y,contentW,5);
+    doc.text(`Em caso de Andaimes sobre pessoal, informado a Segurança do Trabalho? (${condVals.st||" "})`,margin+1,y+3.3);
+    y+=5;
+
+    y=sectionTitle(y,"COMENTÁRIOS DA FISCALIZAÇÃO");
+    const comentH=22;
+    doc.setDrawColor(150,150,150); doc.rect(margin,y,contentW,comentH);
+    doc.setFont("helvetica","normal"); doc.setFontSize(7.5);
+    const coment=gv("coment")||"";
+    doc.text(doc.splitTextToSize(coment,contentW-4),margin+2,y+5);
+    y+=comentH;
+
+    y+=2;
+    y=fieldRow(y,[
+      {label:"FISCAL DE CAMPO",value:gv("fcampo"),w:w3},
+      {label:"SEGURANÇA DO TRABALHO",value:gv("st"),w:w3},
+      {label:"COORDENADOR DE OBRA",value:gv("coord"),w:w3},
+    ]);
+
+    // ── PÁGINA 2 ──────────────────────────────────────────────────────────
+    doc.addPage();
+    y=header("2/2");
+    y=sectionTitle(y,"RELATÓRIO FOTOGRÁFICOS");
+    y+=2;
+
+    const photoW=contentW/2-2;
+    const photoH=85;
+    const positions=[
+      {x:margin,            y:y,            label:"FOTO 01"},
+      {x:margin+photoW+4,   y:y,            label:"FOTO 02"},
+      {x:margin,            y:y+photoH+8,   label:"FOTO 03"},
+      {x:margin+photoW+4,   y:y+photoH+8,   label:"FOTO 04"},
+    ];
+
+    for(let i=0;i<4;i++){
+      const pos=positions[i];
+      doc.setDrawColor(0,0,0); doc.setLineWidth(0.3);
+      doc.rect(pos.x,pos.y,photoW,photoH);
+      if(fotos[i]){
+        try{
+          const info=fotoSizes[i]||{w:4,h:3};
+          const ratio=info.w/info.h;
+          let iw=photoW-4, ih=iw/ratio;
+          if(ih>photoH-4){ ih=photoH-4; iw=ih*ratio; }
+          const ix=pos.x+(photoW-iw)/2;
+          const iy=pos.y+(photoH-ih)/2;
+          doc.addImage(fotos[i],"JPEG",ix,iy,iw,ih);
+        }catch(e){ console.warn("Erro foto PDF",i,e); }
+      }
+      doc.setFillColor(255,255,255);
+      doc.rect(pos.x,pos.y+photoH,photoW,5);
+      doc.setDrawColor(0,0,0); doc.rect(pos.x,pos.y+photoH,photoW,5);
+      doc.setFont("helvetica","bold"); doc.setFontSize(7); doc.setTextColor(0,0,0);
+      doc.text(pos.label,pos.x+photoW/2,pos.y+photoH+3.5,{align:"center"});
+    }
+
+    let y2=positions[2].y+photoH+5+3;
+    y2=fieldRow(y2,[
+      {label:"FISCAL DE CAMPO",value:gv("fcampo"),w:w3},
+      {label:"SEGURANÇA DO TRABALHO",value:gv("st"),w:w3},
+      {label:"COORDENADOR DE OBRA",value:gv("coord"),w:w3},
+    ]);
+
+    const seq=lastSeqNum||String(parseInt(document.getElementById("nrel").dataset.seq||"1")).padStart(3,"0");
+    const pdfFname=`TNE-RIA-${seq}-AMT.pdf`;
+    doc.save(pdfFname);
+
+    setLoad(false);
+    pbtn.className="gbtn ok"; pbtn.textContent="✓ PDF salvo: "+pdfFname;
+    showFileToast(false, pdfFname);
+    setTimeout(()=>{
+      pbtn.className="gbtn"; pbtn.style.background="linear-gradient(135deg,#b8a06a,#caa968)";
+      pbtn.textContent="📄 Gerar PDF";
+      document.getElementById("pdf-wrap").style.display="none";
+      resetApp();
+    },5000);
+
+  }catch(e){
+    setLoad(false);
+    pbtn.className="gbtn"; pbtn.textContent="📄 Gerar PDF";
+    alert("Erro ao gerar PDF:\n"+e.message); console.error(e);
+  }
+}
+
 // ── GERAR EXCEL ───────────────────────────────────────────────────────────
 async function gerarExcel(){
   const btn=document.getElementById("gbtn");
@@ -813,7 +1018,8 @@ async function gerarExcel(){
     btn.className="gbtn ok";
     btn.textContent="✓ Salvo em: Downloads/" + lastFname;
     showFileToast(false, lastFname);
-    setTimeout(()=>{btn.className="gbtn";btn.textContent="⬇ Gerar Relatório";resetApp();},5000);
+    document.getElementById("pdf-wrap").style.display="flex";
+    setTimeout(()=>{btn.className="gbtn";btn.textContent="⬇ Gerar Relatório";},5000);
 
   }catch(e){
     setLoad(false); btn.className="gbtn"; btn.textContent="⬇ Gerar Relatório";
