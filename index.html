@@ -352,6 +352,18 @@ function abrirChangelog(){
 }
 
 // ── CONTADOR ──────────────────────────────────────────────────────────────
+// ── SINCRONIZAÇÃO FISCAL ↔ FISCAL DE CAMPO / TST ↔ SEG. TRABALHO ─────────
+function setSelectValue(id,val){
+  const s=document.getElementById(id); if(!s) return;
+  for(let i=0;i<s.options.length;i++){
+    if(s.options[i].value===val||s.options[i].text===val){s.selectedIndex=i;break;}
+  }
+}
+function syncFiscal(v){ setSelectValue("fcampo",v); }
+function syncFcampo(v){ setSelectValue("fiscal",v); }
+function syncTST(v){ setSelectValue("st",v); }
+function syncST(v){ setSelectValue("tst",v); }
+
 const SK="ria_global_seq";
 function abrirPwd(){
   document.getElementById("pwd-input").value="";
