@@ -313,8 +313,9 @@ input,select,textarea,button,label{font-family:inherit;}
         </div>
       </div>
 
-      <div style="margin-top:10px;">
-        <button class="email-btn" onclick="abrirEmail()">✉️ Abrir e-mail</button>
+      <div style="margin-top:10px;display:flex;gap:8px;">
+        <button class="email-btn" onclick="abrirEmail()" style="flex:1;">✉️ Abrir e-mail</button>
+        <button class="email-btn" onclick="compartilharPDF()" style="flex:1;background:linear-gradient(135deg,#1a5c44,#22744f);" title="Compartilhar PDF">📤 Compartilhar PDF</button>
       </div>
       <div class="email-note" id="email-note">Gere o Excel primeiro, depois clique para abrir o app de e-mail. Anexe o arquivo de Downloads.</div>
     </div>
@@ -674,9 +675,9 @@ function buildDrawingXml(fInfos){
   const MARG=0.08;
   const areas=[
     {rId:"rId3",col:1,row:30,cxPx:485,cyPx:494},
-    {rId:"rId4",col:6,row:30,cxPx:528,cyPx:494},
+    {rId:"rId4",col:6,row:30,cxPx:464,cyPx:494},
     {rId:"rId5",col:1,row:50,cxPx:485,cyPx:494},
-    {rId:"rId6",col:6,row:50,cxPx:528,cyPx:494},
+    {rId:"rId6",col:6,row:50,cxPx:464,cyPx:494},
   ];
   let fxml="";
   areas.forEach((a,i)=>{
@@ -710,13 +711,17 @@ function abrirEmail(){
   const emails=targets.map(d=>d.email).join(",");
   const nrelDisplay=lastNrel||gv("nrel");
   const fname=lastFname||"relatório.xlsx";
+
+  // Data no padrão brasileiro dd/mm/aaaa
+  const dataVal=gv("data");
+  const dataBR=dataVal?new Date(dataVal+"T12:00:00").toLocaleDateString("pt-BR"):"";
+
   const sub=encodeURIComponent("Relatório de Inspeção de Andaimes — "+nrelDisplay);
   const bod=encodeURIComponent(
     "Prezado(a),\n\nSegue o Relatório de Inspeção de Andaimes.\n\n"+
-    "Nº: "+nrelDisplay+"\nData: "+gv("data")+"\nLocal: "+gv("local")+"\nEmpresa: "+gv("emp")+
+    "Nº: "+nrelDisplay+"\nData: "+dataBR+"\nLocal: "+gv("local")+"\nEmpresa: "+gv("emp")+
     "\n\nArquivo: "+fname+"\n(Disponível na pasta Downloads do dispositivo)\n\nAtenciosamente."
   );
-  // Funciona com qualquer cliente: Gmail, Outlook, Yahoo, Samsung Mail, etc.
   const a=document.createElement("a");
   a.href="mailto:"+emails+"?subject="+sub+"&body="+bod;
   a.style.display="none"; document.body.appendChild(a); a.click();
@@ -749,7 +754,163 @@ function resetApp(){
   document.getElementById("email-note").style.color="";
 }
 
-// ── GERAR PDF (replica layout do Excel) ─────────────────────────────────
+function compartilharPDF(){
+  const note=document.getElementById("email-note");
+  // Verificar se jsPDF foi gerado (lastPdfBlob) ou gerar agora
+  if(!lastBlob){
+    note.style.color="#dc2626";
+    note.textContent="⚠️ Gere o relatório primeiro.";
+    return;
+  }
+  // Gerar PDF e compartilhar via Web Share API (abre menu nativo do Android/iOS)
+  // O usuário escolhe: WhatsApp, Gmail, Drive, Telegram, etc.
+  note.textContent="⏳ Gerando PDF para compartilhar...";
+  note.style.color="#94a3b8";
+  
+  // Disparar geração do PDF que já existe na função gerarPDF,
+  // mas capturando o blob para compartilhar em vez de salvar
+  gerarPDFBlob().then(pdfBlob=>{
+    if(!pdfBlob){ note.style.color="#dc2626"; note.textContent="⚠️ Erro ao gerar PDF."; return; }
+    const seq=lastSeqNum||"001";
+    const pdfFname=`TNE-RIA-${seq}-AMT.pdf`;
+    const file=new File([pdfBlob], pdfFname, {type:"application/pdf"});
+    if(navigator.canShare && navigator.canShare({files:[file]})){
+      navigator.share({
+        files:[file],
+        title:"Relatório RIA — "+pdfFname,
+      }).then(()=>{
+        note.style.color="#16a34a";
+        note.textContent="✓ PDF compartilhado!";
+      }).catch(e=>{
+        if(e.name!=="AbortError"){
+          // Fallback: download do PDF
+          const url=URL.createObjectURL(pdfBlob);
+          const a=document.createElement("a"); a.href=url; a.download=pdfFname;
+          a.style.display="none"; document.body.appendChild(a); a.click();
+          setTimeout(()=>{document.body.removeChild(a);URL.revokeObjectURL(url);},1000);
+          note.style.color="#16a34a"; note.textContent="✓ PDF salvo em Downloads.";
+        }
+      });
+    } else {
+      // Navegador sem suporte: baixar o PDF diretamente
+      const url=URL.createObjectURL(pdfBlob);
+      const a=document.createElement("a"); a.href=url; a.download=pdfFname;
+      a.style.display="none"; document.body.appendChild(a); a.click();
+      setTimeout(()=>{document.body.removeChild(a);URL.revokeObjectURL(url);},1000);
+      note.style.color="#16a34a"; note.textContent="✓ PDF salvo em Downloads: "+pdfFname;
+    }
+  });
+}
+
+// Versão interna: gera o PDF e retorna o blob (sem salvar automaticamente)
+async function gerarPDFBlob(){
+  try{
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ unit:"mm", format:"a4", orientation:"portrait" });
+    const pageW=210, margin=10, contentW=210-margin*2;
+    const nrelDisplay=lastNrel||gv("nrel");
+    const dataVal=gv("data");
+    const dataFmt=dataVal?new Date(dataVal+"T12:00:00").toLocaleDateString("pt-BR"):"";
+    function header(folha){
+      doc.setDrawColor(26,92,68); doc.setLineWidth(0.4);
+      doc.rect(margin,margin,contentW,18);
+      try{ const logoImg=document.querySelector(".logo-wrap img"); if(logoImg&&logoImg.src) doc.addImage(logoImg.src,"PNG",margin+2,margin+2,30,14); }catch(e){}
+      doc.setFont("helvetica","bold"); doc.setFontSize(11); doc.setTextColor(20,20,20);
+      doc.text("RELATÓRIO DE INSPEÇÕES DE ANDAIMES",margin+38,margin+10);
+      doc.setFontSize(8); doc.setFont("helvetica","normal");
+      doc.text("Nº Relatório:",pageW-margin-48,margin+5);
+      doc.setFont("helvetica","bold"); doc.text(nrelDisplay,pageW-margin-48,margin+9);
+      doc.setFont("helvetica","normal");
+      doc.text("Data: "+dataFmt,pageW-margin-48,margin+13);
+      doc.text("Folha: "+folha,pageW-margin-48,margin+17);
+      return margin+22;
+    }
+    function fieldRow(y,cols){
+      let x=margin; const h=10;
+      cols.forEach(c=>{
+        doc.setDrawColor(150,150,150); doc.setLineWidth(0.2); doc.rect(x,y,c.w,h);
+        doc.setFillColor(230,230,230); doc.rect(x,y,c.w,5,"F"); doc.rect(x,y,c.w,5);
+        doc.setFont("helvetica","bold"); doc.setFontSize(7); doc.setTextColor(0,0,0);
+        doc.text(c.label,x+c.w/2,y+3.5,{align:"center"});
+        doc.setFont("helvetica","normal"); doc.setFontSize(8);
+        doc.text(String(c.value||""),x+c.w/2,y+8,{align:"center"});
+        x+=c.w;
+      }); return y+h;
+    }
+    function sectionTitle(y,text){
+      doc.setFillColor(26,92,68); doc.rect(margin,y,contentW,6,"F");
+      doc.setFont("helvetica","bold"); doc.setFontSize(8); doc.setTextColor(255,255,255);
+      doc.text(text,margin+2,y+4.2); doc.setTextColor(0,0,0); return y+6;
+    }
+    const w3=contentW/3;
+    let y=header("1/2");
+    y=sectionTitle(y,"IDENTIFICAÇÃO DA NÃO CONFORMIDADE");
+    y=fieldRow(y,[{label:"PROJETO",value:gv("proj"),w:w3},{label:"LOCAL",value:gv("local"),w:w3},{label:"EMPRESA MONTADORA",value:gv("emp"),w:w3}]);
+    y=fieldRow(y,[{label:"DATA DA INSPEÇÃO",value:dataFmt,w:w3},{label:"FISCAL",value:gv("fiscal"),w:w3},{label:"TIPO DE ANDAIME",value:gv("tipo"),w:w3}]);
+    y+=2;
+    doc.setDrawColor(150,150,150); doc.rect(margin,y,contentW,16);
+    doc.setFillColor(230,230,230); doc.rect(margin,y,contentW,5,"F"); doc.rect(margin,y,contentW,5);
+    doc.setFont("helvetica","bold"); doc.setFontSize(7); doc.text("OBJETIVO",margin+2,y+3.5);
+    doc.setFont("helvetica","normal"); doc.setFontSize(6.5);
+    doc.text(doc.splitTextToSize("O presente relatório tem como objetivo registrar a inspeção técnica do andaime industrial, verificando conformidade com NR-18, NR-35 e procedimentos internos de segurança da Arcelor Mittal Tubarão no projeto Despoeiramento do Topo da Aciaria.",contentW-4),margin+2,y+9);
+    y+=18;
+    y=sectionTitle(y,"CHECK LIST DE INSPEÇÃO");
+    const ckRows=[
+      [["Base Nivelada","bNiv"],["Rodapé Instalado","rod"],["Etiqueta de Liberação","etiq"],["Andaime sobre Equipamentos","seq"]],
+      [["Sapatas Instaladas","sap"],["Escada de Acesso","esc"],["Linha de Vida Instalada","lv"],["Andaime sobre Pesssoas","spes"]],
+      [["Guarda-Corpo Instalado","gc"],["Plataforma Completa","plat"],["Área Sinalizada","sinal"],["Outros","out"]],
+    ];
+    const w4=contentW/4;
+    ckRows.forEach(row=>{
+      doc.setDrawColor(150,150,150); let x=margin;
+      row.forEach(([label,key])=>{
+        doc.rect(x,y,w4,6);
+        let val=ckVals[key]||" ";
+        let txt=`(${val}) ${label}`;
+        if(key==="out"&&val==="S"){const ot=document.getElementById("out-txt").value||"";if(ot)txt=`(S) Outros: ${ot}`;}
+        doc.setFontSize(6.5); doc.text(doc.splitTextToSize(txt,w4-2),x+1,y+3,{maxWidth:w4-2}); x+=w4;
+      }); y+=6;
+    });
+    doc.setFontSize(6.5);
+    doc.rect(margin,y,contentW,5); doc.text(`Em caso de Andaimes sobre equipamentos, informado ao User Leader? (${condVals.eq||" "})`,margin+1,y+3.3); y+=5;
+    doc.rect(margin,y,contentW,5); doc.text(`Em caso de Andaimes sobre pessoal, informado a Segurança do Trabalho? (${condVals.st||" "})`,margin+1,y+3.3); y+=5;
+    y=sectionTitle(y,"COMENTÁRIOS DA FISCALIZAÇÃO");
+    doc.setDrawColor(150,150,150); doc.rect(margin,y,contentW,22);
+    doc.setFont("helvetica","normal"); doc.setFontSize(7.5);
+    doc.text(doc.splitTextToSize(gv("coment")||"",contentW-4),margin+2,y+5); y+=22;
+    y+=2; y=fieldRow(y,[{label:"FISCAL DE CAMPO",value:gv("fcampo"),w:w3},{label:"SEGURANÇA DO TRABALHO",value:gv("st"),w:w3},{label:"COORDENADOR DE OBRA",value:gv("coord"),w:w3}]);
+    doc.addPage();
+    y=header("2/2");
+    y=sectionTitle(y,"RELATÓRIO FOTOGRÁFICOS"); y+=2;
+    const photoW=contentW/2-2, photoH=85;
+    const positions=[
+      {x:margin,y:y,label:"FOTO 01"},{x:margin+photoW+4,y:y,label:"FOTO 02"},
+      {x:margin,y:y+photoH+8,label:"FOTO 03"},{x:margin+photoW+4,y:y+photoH+8,label:"FOTO 04"},
+    ];
+    for(let i=0;i<4;i++){
+      const pos=positions[i];
+      doc.setDrawColor(0,0,0); doc.setLineWidth(0.3); doc.rect(pos.x,pos.y,photoW,photoH);
+      if(fotos[i]){
+        try{
+          const info=fotoSizes[i]||{w:4,h:3};
+          const ratio=info.w/info.h;
+          let iw=photoW-4, ih=iw/ratio;
+          if(ih>photoH-4){ih=photoH-4;iw=ih*ratio;}
+          doc.addImage(fotos[i],"JPEG",pos.x+(photoW-iw)/2,pos.y+(photoH-ih)/2,iw,ih);
+        }catch(e){}
+      }
+      doc.setFillColor(255,255,255); doc.rect(pos.x,pos.y+photoH,photoW,5);
+      doc.setDrawColor(0,0,0); doc.rect(pos.x,pos.y+photoH,photoW,5);
+      doc.setFont("helvetica","bold"); doc.setFontSize(7);
+      doc.text(pos.label,pos.x+photoW/2,pos.y+photoH+3.5,{align:"center"});
+    }
+    let y2=positions[2].y+photoH+5+3;
+    fieldRow(y2,[{label:"FISCAL DE CAMPO",value:gv("fcampo"),w:w3},{label:"SEGURANÇA DO TRABALHO",value:gv("st"),w:w3},{label:"COORDENADOR DE OBRA",value:gv("coord"),w:w3}]);
+    return doc.output("blob");
+  }catch(e){ console.error(e); return null; }
+}
+
+
 async function gerarPDF(){
   const pbtn=document.getElementById("pdfbtn");
   pbtn.className="gbtn wait"; pbtn.textContent="Gerando PDF...";
